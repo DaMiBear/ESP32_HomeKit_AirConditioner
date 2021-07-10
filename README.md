@@ -55,7 +55,7 @@
 
 
 
-2、使用VS Code打开这个项目文件夹，先clean一下项目，按F1输入ESP Full Clean Project，把build文件夹删除，要不然编译会报错，除非项目路径和我编译时候的一模一样。
+2、使用VS Code打开这个项目文件夹，先clean一下项目，按F1输入ESP Full Clean Project（如果有build文件夹就是把build文件夹删除）要不然里面的某些文件路径可能会导致编译会报错，除非项目路径和我编译时候的一模一样。
 
 ![0](/docs/images/0.png)
 

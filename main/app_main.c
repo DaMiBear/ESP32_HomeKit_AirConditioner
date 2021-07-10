@@ -155,7 +155,7 @@ static int air_conditioner_write(hap_write_data_t write_data[], int count,
     // static AC_FAN_SPEED last_fan_mode = AUTO_FAN_SPEED;
     // bool enable_send = false;
     hap_write_data_t *write;
-    printf("DEBUG!!!!!!!!!!! count: %d\n", count);
+    // printf("DEBUG!!!!!!!!!!! count: %d\n", count);
     for (i = 0; i < count; i++) {
         /* 每次只对一个特征hc进行处理 */
         write = &write_data[i];
