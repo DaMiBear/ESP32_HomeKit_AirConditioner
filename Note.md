@@ -4,7 +4,7 @@
 
 ## 硬件部分
 
-[原理图和PCB文件](/docs/AD_files)可以在/docs/AD_files中找到。
+[原理图和PCB文件](/docs/AD_files)可以在/docs/原理图PCB中找到。
 
 ### 锂电池充电放电
 
