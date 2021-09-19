@@ -35,7 +35,7 @@
 - ESP HomeKit SDK
 
 ### ESP-IDF
- 
+
 要搞好关于ESP-IDF的安装，需要一个比较好的网络，我安装失败了很多次，几乎都是网络问题。具体请参考[官方教程](https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/get-started/index.html)。我只是补充一下，如果用windows的[ESP-IDF 工具安装器](https://dl.espressif.com/dl/esp-idf/?idf=4.4)嫌麻烦建议直接下载离线版本，虽然大，但是解千愁，不会出现什么失败的问题。如果是想用[VS Code的IDE插件](https://github.com/espressif/vscode-esp-idf-extension)的话，也最好找个网好的地方安装，如果本地没有esp-idf，那么要是esp-idf下载失败就会从头开始下载，即使使用本地的esp-idf文件，但是还是需要下载其他东西的，而且这些东西，也挺容易下载失败的，我自己下的时候就算科学上网也是失败了很多次。我下载的时候是4.2版本的，后面更新到4.3也是可以的（4.3好像会弹一些警告），下面以VS Code的IDE插件为例。
 
 ### ESP HomeKit SDK
@@ -47,7 +47,10 @@
 ### 编译准备
 
 1、先把这个项目文件夹放到/esp-homekit-sdk/examples目录下面.
-> 因为默认[CMakeList.txt](/CMakeLists.txt)的文件是读取上上级目录中的HomeKitSDK的路径，如下面所示。或者修改根目录下的CMakeLists.txt文件里面添加HomeKitSDK的组件也可以，[CMakeLists文件说明传送门](https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/api-guides/build-system.html#cmakelists)。
+
+**切记**项目文件夹的路径不要太深，导致路径太长，这样会导致编译过程中出现问题。
+
+> 因为默认[CMakeList.txt](/CMakeLists.txt)的文件是读取上上级目录中的HomeKitSDK的路径，如下面所示。或者修改根目录下的CMakeLists.txt文件里面添加HomeKitSDK的组件也可以，[CMakeLists文件说明传送门](https://docs.espressif.com/projects/esp-idf/zh_CN/latest/esp32/api-guides/build-system.html#cmakelists)。或者自己定义系统变量`HOMEKIT_PATH`
 
 
 	if(DEFINED ENV{HOMEKIT_PATH})
@@ -133,5 +136,4 @@
 至于延时关机开机的功能，没有加上去，第一因为懒，第二是因为在快捷指令App中的自动化可以完成这些功能。
 
 具体的细节，硬件设计思路，程序思路可以参考本人的[笔记](/Note.md)。
-
 
