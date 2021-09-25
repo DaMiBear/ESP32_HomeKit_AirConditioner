@@ -75,6 +75,9 @@ AC_INFO ac_current_info = {
 static TickType_t ac_send_tick_count = 0;
 
 bool ac_send_r05d_code_flag = false;    // 是否可以发送红外信号
+
+esp_pm_lock_handle_t rmt_send_task_pm_lock = NULL;  // 电源管理锁，用于防止在要使用rmt时自动进入light-sleep状态
+
 /**
  * @brief The network reset button callback handler.
  * Useful for testing the Wi-Fi re-configuration feature of WAC2
@@ -515,6 +518,7 @@ static void air_conditioner_thread_entry(void *arg)
 #endif
 #endif
 
+    ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 1, "rmt_send_task", &rmt_send_task_pm_lock));     // 创建锁
     /* Initialize Wi-Fi */
     app_wifi_init();
 
@@ -538,6 +542,7 @@ air_conditioner_err:
 static void air_conditioner_send_task(void *arg)
 {
     TickType_t nowTickCount = 0;
+    
     while (1)
     {
         if (ac_send_r05d_code_flag == true)
@@ -545,8 +550,10 @@ static void air_conditioner_send_task(void *arg)
             nowTickCount = xTaskGetTickCount();
             if ((TickType_t)(nowTickCount - ac_send_tick_count) > pdMS_TO_TICKS(1500))
             {
+                esp_pm_lock_acquire(rmt_send_task_pm_lock);  // 获取锁
                 ac_send_r05d_code(ac_current_info);
                 ac_send_r05d_code_flag = false;
+                esp_pm_lock_release(rmt_send_task_pm_lock); // 释放锁
                 air_conditioner_send_task_handle = NULL;    // 赋值为NULL 也就是删除自己
                 vTaskDelete(air_conditioner_send_task_handle);      // 发送一次后删除任务
 
@@ -557,6 +564,9 @@ static void air_conditioner_send_task(void *arg)
     
 }
 #ifdef CONFIG_PM_PROFILING
+/**
+ * 用来打印相关pm的信息
+ */
 static void pm_track_task(void *arg)
 {
     while (1)

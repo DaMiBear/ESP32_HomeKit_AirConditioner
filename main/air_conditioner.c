@@ -77,6 +77,8 @@ void air_conditioner_init(void)
     /* 红外初始化 */
     rmt_config_t rmt_tx_config = RMT_DEFAULT_CONFIG_TX(RMT_TX_GPIO, ac_tx_channel);
     rmt_tx_config.tx_config.carrier_en = true;
+    rmt_tx_config.flags = RMT_CHANNEL_FLAGS_AWARE_DFS;
+    rmt_tx_config.clk_div = 1;
     rmt_config(&rmt_tx_config);
     rmt_driver_install(ac_tx_channel, 0, 0);
     ir_builder_config_t ir_builder_config = IR_BUILDER_DEFAULT_CONFIG((ir_dev_t)ac_tx_channel);
