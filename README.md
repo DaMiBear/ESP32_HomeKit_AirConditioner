@@ -3,7 +3,7 @@
 
 - **2021.9.25**：根据power_save例程添加了light-sleep模式及DFS，系统自动决定CPU频率和是否进入light-sleep模式。
 
-  **因为手里只有一个量程为20A的电流表（小量程用不了），测得结果肯定不准确，之前的代码在不用家庭App操控时的电流大约为30~40mA，现在大约为10~20mA，如果与家庭App通信时电流大约为40~70mA**
+  **因为手里只有一个量程为20A的电流表（小量程用不了），测得结果肯定不准确，之前的代码在不用家庭App操控时的电流大约为30\~40mA，现在大约为10\~20mA，如果与家庭App通信时电流大约为40~70mA**
 
   目前只添加了WiFi使用HARDCODED时的代码；以及`rmt_config_t`变量中的成员`flags`设置为`RMT_CHANNEL_FLAGS_AWARE_DFS`和`clk_div`为`1`以支持DFS；在发生红外指令时，调用电源管理锁`esp_pm_lock_handle_t`防止自动进入light-sleep模式。
 
