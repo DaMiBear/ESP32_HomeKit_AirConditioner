@@ -1,4 +1,51 @@
 # 接入HomeKit的ESP32空调控制器
+## 更新日志
+
+- **2021.9.25**：根据power_save例程添加了light-sleep模式及DFS，系统自动决定CPU频率和是否进入light-sleep模式。
+
+  目前只添加了WiFi使用HARDCODED时的代码；以及`rmt_config_t`变量中的成员`flags`设置为`RMT_CHANNEL_FLAGS_AWARE_DFS`和`clk_div`为`1`以支持DFS；在发生红外指令时，调用电源管理锁`esp_pm_lock_handle_t`防止自动进入light-sleep模式。（**续航目前未测试**）
+
+  1. 需要在menuconfig中启动`Support for power management`和`Tickless idle support`选项，以及进行`WiFi listen interval`、`power save mode`和`Maximum/Minimum CPU frequency`配置
+
+  2. 需要在`esp-homekit-sdk/examples/common/app_wifi/app_wifi.c`中275行
+
+  ```c
+  #ifdef CONFIG_APP_WIFI_USE_HARDCODED
+  #define APP_WIFI_SSID   CONFIG_APP_WIFI_SSID
+  #define APP_WIFI_PASS   CONFIG_APP_WIFI_PASSWORD
+  ```
+
+  下面添加如下宏定义：
+
+  ```c
+  #define DEFAULT_LISTEN_INTERVAL CONFIG_APP_WIFI_LISTEN_INTERVAL
+  
+  #if CONFIG_APP_POWER_SAVE_MIN_MODEM
+  #define DEFAULT_PS_MODE WIFI_PS_MIN_MODEM
+  #elif CONFIG_APP_POWER_SAVE_MAX_MODEM
+  #define DEFAULT_PS_MODE WIFI_PS_MAX_MODEM
+  #elif CONFIG_APP_POWER_SAVE_NONE
+  #define DEFAULT_PS_MODE WIFI_PS_NONE
+  #else
+  #define DEFAULT_PS_MODE WIFI_PS_NONE
+  #endif /*CONFIG_POWER_SAVE_MODEM*/
+  ```
+
+  3. `app_wifi_start()`函数中`password`下面添加一行
+
+  `.listen_interval = DEFAULT_LISTEN_INTERVAL,`
+
+  4. `ESP_ERROR_CHECK(esp_wifi_start() );`下面添加
+
+  ```c
+  ESP_LOGI(TAG, "esp_wifi_set_ps().");
+  esp_wifi_set_ps(DEFAULT_PS_MODE);
+  ```
+
+  > 相关宏定义会在main/Kconfig.projbuild文件中自动生成。
+  >
+  > 附上修改后的[app_wifi.c](/docs/changed_src/app_wifi.c)文件。
+
 ## 介绍
 
 - 因为宿舍空调遥控器有问题，而且最近没啥事情做，所以想到使用ESP32做一个空调伴侣，接入Apple的HomeKit实现iOS设备对空调的控制，目前只能对美的空调进行控制，只包括基本功能：**开关**、**模式**(自动、制冷、制热)、**温度**(制冷17-30℃，制热17-25℃)、**风速**(自动风、低、中、高风)。锂电池供电，可用MicroUSB接口充电，充满自动断开，基本的锂电池保护（硬件是设计了但我也没实际测试过O(∩_∩)O），锂电池保护，DW07D这里要注意一点，就是如果第一次装上电池，需要先充电一下才能正常供电，只要不把电池拆下来，就不必再这样做。
@@ -137,3 +184,9 @@
 
 具体的细节，硬件设计思路，程序思路可以参考本人的[笔记](/Note.md)。
 
+## 遇到的bug
+
+- 在添加DFS和light-sleep调试的时候，遇到过下载程序后复位发生两次或者数次重启的情况，在断开USB接口重新插入后正常启动，后来这些bug莫名其妙消失了，也许是因为清空了FLASH。
+
+- 在IOS15时，添加配件完成后，对配件进行相关操作时，家庭App中无法切换至显示操作后的状态，比如一开始是关闭状态，要设置为制冷模式，家庭App中设置以后，配件实际上执行了相应的操作，但是在家庭App中还是立马切换至了关闭的状态。这种情况关闭家庭App后重新打开即可。
+- IOS15中，改变风速后，遇到过一次配件接收不到相应的指令的情况。也许是因为`power save mode`设置为`minimum modem`的原因。

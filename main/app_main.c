@@ -40,6 +40,7 @@
 #include <app_wifi.h>
 #include <app_hap_setup_payload.h>
 
+#include "esp_pm.h"
 #include "air_conditioner.h"
 
 /* Comment out the below line to disable Firmware Upgrades */
@@ -60,6 +61,10 @@ static const char *TAG = "HAP Air Conditioner";
 /* The button "Boot" will be used as the Reset button for the example */
 #define RESET_GPIO  GPIO_NUM_0
 
+static void air_conditioner_send_task(void *arg);
+
+TaskHandle_t air_conditioner_send_task_handle = NULL;
+
 AC_INFO ac_current_info = {
     .on = false,
     .mode = AUTO_MODE,
@@ -70,6 +75,9 @@ AC_INFO ac_current_info = {
 static TickType_t ac_send_tick_count = 0;
 
 bool ac_send_r05d_code_flag = false;    // 是否可以发送红外信号
+
+esp_pm_lock_handle_t rmt_send_task_pm_lock = NULL;  // 电源管理锁，用于防止在要使用rmt时自动进入light-sleep状态
+
 /**
  * @brief The network reset button callback handler.
  * Useful for testing the Wi-Fi re-configuration feature of WAC2
@@ -266,19 +274,27 @@ static int air_conditioner_write(hap_write_data_t write_data[], int count,
         else {
             *(write->status) = HAP_STATUS_RES_ABSENT;
         }
+
         /* If the characteristic write was successful, update it in hap core
          */
         if (*(write->status) == HAP_STATUS_SUCCESS) {
             hap_char_update_val(write->hc, &(write->val));
         } else {
             /* Else, set the return value appropriately to report error */
-            ESP_LOGI(TAG, "Received Write for Air Conditioner Failed!");
+            ESP_LOGE(TAG, "Received Write for Air Conditioner Failed!");
             ret = HAP_FAIL;
         }
     }
     /* 在保存设定的状态后，使能发送红外指令的信号，并且记录此时的tick计数 */
     ac_send_r05d_code_flag = true;
     ac_send_tick_count = xTaskGetTickCount();   // 更新当前要发红外时的tick计数
+    if (air_conditioner_send_task_handle == NULL)   // 如果没有被创建，则创建air_conditioner_send_task任务
+    {
+        xTaskCreate(air_conditioner_send_task, "air_conditioner_send_task", 2048, NULL, 1, &air_conditioner_send_task_handle);  
+        if (air_conditioner_send_task_handle == NULL)
+            ESP_LOGE(TAG, "Create air_conditioner_send_task fail!");
+    }
+        
     return ret;
 }
 
@@ -388,7 +404,7 @@ static void air_conditioner_thread_entry(void *arg)
         .manufacturer = "DM",
         .model = "Esp32_01",
         .serial_num = "0000001",
-        .fw_rev = "0.1.0",
+        .fw_rev = "0.1.1",
         .hw_rev = "1.0",
         .pv = "1.1.0",
         .identify_routine = air_conditioner_identify,
@@ -483,6 +499,26 @@ static void air_conditioner_thread_entry(void *arg)
     /* Enable Hardware MFi authentication (applicable only for MFi variant of SDK) */
     hap_enable_mfi_auth(HAP_MFI_AUTH_HW);
 
+    /**
+     * Configure dynamic frequency scaling:
+     * maximum and minimum frequencies are set in sdkconfig,
+     * automatic light sleep is enabled if tickless idle support is enabled. 
+     * 
+     */
+#if CONFIG_PM_ENABLE
+#if CONFIG_IDF_TARGET_ESP32
+    esp_pm_config_esp32_t pm_config = {
+        .max_freq_mhz = CONFIG_APP_MAX_CPU_FREQ_MHZ,
+        .min_freq_mhz = CONFIG_APP_MIN_CPU_FREQ_MHZ,
+#if CONFIG_FREERTOS_USE_TICKLESS_IDLE
+        .light_sleep_enable = true
+#endif
+    };
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+#endif
+#endif
+
+    ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 1, "rmt_send_task", &rmt_send_task_pm_lock));     // 创建锁
     /* Initialize Wi-Fi */
     app_wifi_init();
 
@@ -506,6 +542,7 @@ air_conditioner_err:
 static void air_conditioner_send_task(void *arg)
 {
     TickType_t nowTickCount = 0;
+    
     while (1)
     {
         if (ac_send_r05d_code_flag == true)
@@ -513,18 +550,39 @@ static void air_conditioner_send_task(void *arg)
             nowTickCount = xTaskGetTickCount();
             if ((TickType_t)(nowTickCount - ac_send_tick_count) > pdMS_TO_TICKS(1500))
             {
+                esp_pm_lock_acquire(rmt_send_task_pm_lock);  // 获取锁
                 ac_send_r05d_code(ac_current_info);
                 ac_send_r05d_code_flag = false;
+                esp_pm_lock_release(rmt_send_task_pm_lock); // 释放锁
+                air_conditioner_send_task_handle = NULL;    // 赋值为NULL 也就是删除自己
+                vTaskDelete(air_conditioner_send_task_handle);      // 发送一次后删除任务
+
             }
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-    vTaskDelete(NULL);
+    
 }
-
+#ifdef CONFIG_PM_PROFILING
+/**
+ * 用来打印相关pm的信息
+ */
+static void pm_track_task(void *arg)
+{
+    while (1)
+    {
+        esp_pm_dump_locks(stdout);
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    
+    
+}
+#endif
 void app_main()
 {
     xTaskCreate(air_conditioner_thread_entry, AIRCONDITIONER_TASK_NAME, AIRCONDITIONER_TASK_STACKSIZE,
             NULL, AIRCONDITIONER_TASK_PRIORITY, NULL);
-    xTaskCreate(air_conditioner_send_task, "air_conditioner_send_task", 2048, NULL, 10, NULL);
+#ifdef CONFIG_PM_PROFILING
+    xTaskCreate(pm_track_task, "pm_track_task", 2048, NULL, 0, NULL);
+#endif
 }
