@@ -518,7 +518,7 @@ static void air_conditioner_thread_entry(void *arg)
 #endif
 #endif
 
-    ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 1, "rmt_send_task", &rmt_send_task_pm_lock));     // 创建锁
+    ESP_ERROR_CHECK(esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "rmt_send_task", &rmt_send_task_pm_lock));     // 创建锁
     /* Initialize Wi-Fi */
     app_wifi_init();
 
